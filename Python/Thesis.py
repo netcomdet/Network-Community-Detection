@@ -1,8 +1,9 @@
 from Commonality import *
+import os.path
 
-graph_file_path = 'C:\\University\\Comunity Detection\\Data\\Youtube.txt'
+graph_file_path = os.path.dirname(__file__) + '/../Data/Amazon.txt'
 graph_delimiter = '\t'
-executions_folder = 'C:\\University\\Comunity Detection\\Executions\\'
+executions_folder = os.path.dirname(__file__) + '/../Executions'
 
 # For loading Karate Club Graph:
 # import networkx as nx

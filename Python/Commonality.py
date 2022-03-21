@@ -6,7 +6,6 @@ import os
 import ntpath
 import random
 from pymongo import UpdateOne
-
 from Mongo import *
 from datetime import datetime
 

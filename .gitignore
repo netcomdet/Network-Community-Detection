@@ -2,3 +2,5 @@ Executions/
 Data/AmazonCmty/
 Data/DblpCmty/
 Data/YoutubeCmty/
+Python/__pycache__/
+.idea/

@@ -5,6 +5,8 @@ import numpy as np
 import os
 import ntpath
 import random
+
+from statistics import mean, median
 from pymongo import UpdateOne
 from Mongo import *
 from datetime import datetime
@@ -70,6 +72,8 @@ class Commonality:
 
         self._d1_additions = self._get_commonality_additions(1)
         self._d2_additions = self._get_commonality_additions(2)
+
+        self._k_array = []
 
     def _get_tuple(self, a, b):
         if a < b:
@@ -177,13 +181,9 @@ class Commonality:
 
         plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Compare_' + column_name + '_K_Smaller_1000_D=' + str(d) + '.png')
 
-    def _box_plot(self, df, d, a, b):
-
-        df['calculation'] = (df['numerator'] ** a) / (df['denominator_union'] ** b)
+    def _box_plot(self, df, title, folder_name, file_name):
 
         values_arr = df['calculation'].tolist()
-
-        plt.clf()
 
         inner_df = df[df['is_inner'] == 1][['calculation']]
         outer_df = df[df['is_inner'] == 0][['calculation']]
@@ -193,14 +193,43 @@ class Commonality:
 
         data = [values_arr, values_inner_arr, values_outer_arr]
 
-        plt.boxplot(data)
-        plt.title('Box Plot a=' + str(a) + ' b=' + str(b) + ' D=' + str(d), fontsize=18)
+        plt.clf()
+
+        plt.boxplot(data, showfliers=False)
+        plt.title(title, fontsize=18)
         plt.xticks([1, 2, 3], ['All Data', 'Inner', 'Outer'])
 
-        folder_name = 'Box_Plot'
-        self._check_folder(self._output_path + '/' + folder_name)
+        self._check_folder(folder_name)
 
-        plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Box_Plot_a=' + str(a) + '_b=' + str(b) + '_D=' + str(d) + '.png')
+        plt.savefig(folder_name + '/' + file_name)
+
+    def _box_plot_k(self, df, d, mean, median):
+        df['calculation'] = (df['numerator'] ** 2) / (df['denominator_union'] * mean)
+
+        mean_str = str(format(mean, '.2f'))
+
+        title = 'Box Plot Mean=' + mean_str + ' D=' + str(d)
+        folder_name = self._output_path + '/' + 'Box_Plot'
+        file_name = self._graph.name + '_Box_Plot_Mean=' + mean_str + '_D=' + str(d) + '.png'
+
+        self._box_plot(df, title, folder_name, file_name)
+
+        df['calculation'] = (df['numerator'] ** 2) / (df['denominator_union'] * median)
+
+        title = 'Box Plot Median=' + str(median) + ' D=' + str(d)
+        folder_name = self._output_path + '/' + 'Box_Plot'
+        file_name = self._graph.name + '_Box_Plot_Median=' + str(median) + '_D=' + str(d) + '.png'
+
+        self._box_plot(df, title, folder_name, file_name)
+
+    def _box_plot_ab(self, df, d, a, b):
+        df['calculation'] = (df['numerator'] ** a) / (df['denominator_union'] ** b)
+
+        title = 'Box Plot a=' + str(a) + ' b=' + str(b) + ' D=' + str(d)
+        folder_name = self._output_path + '/' + 'Box_Plot'
+        file_name = self._graph.name + '_Box_Plot_a=' + str(a) + '_b=' + str(b) + '_D=' + str(d) + '.png'
+
+        self._box_plot(df, title, folder_name, file_name)
 
     def _process_d_columns(self, d_list, d):
         random.shuffle(d_list)
@@ -208,17 +237,19 @@ class Commonality:
         df = pd.DataFrame(d_list)
 
         if 'is_inner' in df.columns:
-            self._box_plot(df, d, 1, 1)
-            self._box_plot(df, d, 1, 0.5)
-            self._box_plot(df, d, 1, 0)
+            self._box_plot_ab(df, d, 2, 2)
+            self._box_plot_ab(df, d, 2, 1)
+            self._box_plot_ab(df, d, 2, 0)
 
-            self._box_plot(df, d, 0.5, 1)
-            self._box_plot(df, d, 0.5, 0.5)
-            self._box_plot(df, d, 0.5, 0)
+            self._box_plot_ab(df, d, 1, 2)
+            self._box_plot_ab(df, d, 1, 1)
+            self._box_plot_ab(df, d, 1, 0)
 
-            self._box_plot(df, d, 0, 1)
-            self._box_plot(df, d, 0, 0.5)
-            self._box_plot(df, d, 0, 0)
+            self._box_plot_ab(df, d, 0, 2)
+            self._box_plot_ab(df, d, 0, 1)
+            self._box_plot_ab(df, d, 0, 0)
+
+            self._box_plot_k(df, d, mean(self._k_array), median(self._k_array))
 
         count_for_avg = 1
 
@@ -343,6 +374,9 @@ class Commonality:
 
                     if len_path == 2:
                         self._compute_commonality(node_from, node_from_neighbors, node_to, 1, self._d1_additions)
+
+                        self._k_array.append(len(node_from_neighbors))
+
                     elif len_path == 3:
                         self._compute_commonality(node_from, node_from_neighbors, node_to, 2, self._d2_additions)
 

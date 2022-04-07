@@ -345,7 +345,6 @@ class Commonality:
 
         if d == 1:
             arr_for_mongo = self._d1_arr_for_mongo
-
         elif d == 2:
             arr_for_mongo = self._d2_arr_for_mongo
 

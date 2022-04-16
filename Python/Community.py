@@ -4,19 +4,25 @@ import networkx as nx
 import os
 
 
-def preprocess_community(file_path, file_delimiter, output_folder):
-    file = open(file_path, file_delimiter)
+def preprocess_community(file_path, output_folder):
+    file = open(file_path, 'r')
 
     for line in file:
+
         split = line.replace('\n', '').split('\t')
-        node1 = split.pop(0)
-        while split:
-            file_to_write = open(output_folder + node1 + '.txt', 'a')
-            for i in range(len(split)):
-                node2 = split[i]
-                file_to_write.write(node1 + ' ' + node2 + '\n')
-            file_to_write.close()
+
+        if len(split) > 2:
             node1 = split.pop(0)
+
+            while split:
+                file_to_write = open(output_folder + node1 + '.txt', 'a')
+
+                for i in range(len(split)):
+                    node2 = split[i]
+                    file_to_write.write(node1 + ' ' + node2 + '\n')
+
+                file_to_write.close()
+                node1 = split.pop(0)
 
     file.close()
 

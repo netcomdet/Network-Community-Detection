@@ -7,19 +7,25 @@ import ntpath
 import random
 
 from statistics import mean, median
-from pymongo import UpdateOne
 from Mongo import *
 from datetime import datetime
 
 
+def _check_folder(folder_name):
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
+
+
 class Commonality:
-    def __init__(self):
+    def __init__(self, log):
         self._graph = nx.Graph()
         self._mongo = Mongo()
 
+        self._log = log
+
     @classmethod
-    def load_from_graph(cls, graph, executions_folder):
-        commonality = cls()
+    def load_from_graph(cls, graph, executions_folder, log=True):
+        commonality = cls(log)
 
         commonality._graph = graph
 
@@ -31,8 +37,8 @@ class Commonality:
         return commonality
 
     @classmethod
-    def load_from_file(cls, graph_file_path, graph_delimiter, executions_folder):
-        commonality = cls()
+    def load_from_file(cls, graph_file_path, graph_delimiter, executions_folder, log=True):
+        commonality = cls(log)
 
         file = open(graph_file_path, 'r')
 
@@ -62,32 +68,20 @@ class Commonality:
         os.makedirs(self._output_path)
 
         self._commonality_init()
+        self._community_init()
 
     def _commonality_init(self):
-        self._d1_count = 1
-        self._d2_count = 1
+        self._count = [1, 1]
 
-        self._d1_arr_for_mongo = []
-        self._d2_arr_for_mongo = []
+        self._arr_for_mongo = [[], []]
 
-        self._d1_additions = self._get_commonality_additions(1)
-        self._d2_additions = self._get_commonality_additions(2)
+        self._community_graph = nx.Graph()
 
         self._k_array = []
 
-    def _get_tuple(self, a, b):
-        if a < b:
-            return a, b
-        return b, a
-
-    def _get_commonality_additions(self, d):
-        if d == 1:
-            return 2, 2
-        return 0, 2
-
-    def _check_folder(self, folder_name):
-        if not os.path.exists(folder_name):
-            os.makedirs(folder_name)
+    def _community_init(self):
+        self._community_c1 = 0.2
+        self._community_c2 = 0.2
 
     def _save_d(self, d_list, d):
         file_name_txt = self._graph.name + '_D=' + str(d) + '.txt'
@@ -133,13 +127,13 @@ class Commonality:
         plt.title('Distribution D=' + str(d) + ', Compute By=' + column_name)
 
         folder_name = 'Distribution'
-        self._check_folder(self._output_path + '/' + folder_name)
+        _check_folder(self._output_path + '/' + folder_name)
 
         plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Distribution_D=' + str(d) + '_' + column_name + '.png')
 
     def _save_arr_k_compare(self, values_arr, k_big_arr, k_small_arr, d, column_name):
         folder_name = 'Compare_To_K'
-        self._check_folder(self._output_path + '/' + folder_name)
+        _check_folder(self._output_path + '/' + folder_name)
 
         plt.clf()
         plt.plot(values_arr, k_big_arr, 'bo', ms=1)
@@ -199,7 +193,7 @@ class Commonality:
         plt.title(title, fontsize=18)
         plt.xticks([1, 2, 3], ['All Data', 'Inner', 'Outer'])
 
-        self._check_folder(folder_name)
+        _check_folder(folder_name)
 
         plt.savefig(folder_name + '/' + file_name)
 
@@ -331,40 +325,55 @@ class Commonality:
         else:
             self._process_partial_d(d2_count, 2, self._mongo.d2_get_index_range, self._mongo.d2_get_by_index_list)
 
-    def _compute_commonality(self, node_from, list_node_from_neighbors, node_to, d, additions_arr):  # add parameters arr_for_mongo, d1_insert_many
-        node_to_neighbors = self._graph.neighbors(node_to)
+    def _get_commonality(self, node1, node2):
+        if node1 > node2:
+            min_node = node2
+            max_node = node1
+        else:
+            min_node = node1
+            max_node = node2
 
-        list_node_to_neighbors = list(node_to_neighbors)
+        if (min_node, max_node) not in self._commonality_calculation:
+            numerator, denominator = self._calculate_commonality(node1, node2)
+            self._commonality_calculation[(min_node, max_node)] = numerator / denominator
 
-        len_l1 = len(list_node_from_neighbors)
-        len_l2 = len(list_node_to_neighbors)
+        return self._commonality_calculation[(min_node, max_node)]
 
-        numerator = len(list(set(list_node_from_neighbors).intersection(list_node_to_neighbors))) + additions_arr[0]
+    def _calculate_commonality(self, node1, node2):
+        node1_neighbors = list(self._graph.neighbors(node1))
+        node2_neighbors = list(self._graph.neighbors(node2))
 
-        denominator_union = len_l1 + len_l2 - numerator + additions_arr[1]
+        if self._graph.has_edge(node1, node2):
+            numerator_addition = 2
+        else:
+            numerator_addition = 0
 
-        if d == 1:
-            arr_for_mongo = self._d1_arr_for_mongo
-        elif d == 2:
-            arr_for_mongo = self._d2_arr_for_mongo
+        numerator = len(list(set(node1_neighbors).intersection(node2_neighbors))) + numerator_addition
 
-        arr_for_mongo.append(UpdateOne({'first': node_from, 'second': node_to}, {'$set': {'numerator': numerator, 'denominator_union': denominator_union}}))
+        denominator = len(node1_neighbors) + len(node2_neighbors) - numerator + 2
 
-        if len(arr_for_mongo) == 1000000:
+        return numerator, denominator
+
+    def _compute_commonality(self, node_from, node_to, d):
+        numerator, denominator = self._calculate_commonality(node_from, node_to)
+
+        self._arr_for_mongo[d-1].append({'first': node_from, 'second': node_to, 'index': self._count[d-1], 'numerator': numerator, 'denominator': denominator})
+
+        if len(self._arr_for_mongo[d-1]) == 1000000:
             if d == 1:
-                self._mongo.d1_bulk_write_update_many(arr_for_mongo)
+                self._mongo.d1_insert_many(self._arr_for_mongo[d-1])
             elif d == 2:
-                self._mongo.d2_bulk_write_update_many(arr_for_mongo)
+                self._mongo.d2_insert_many(self._arr_for_mongo[d-1])
 
-            arr_for_mongo.clear()
+            self._arr_for_mongo[d-1].clear()
+
+        self._count[d-1] += 1
 
     def process_commonality(self):
         shortest_path_gen = nx.all_pairs_shortest_path(self._graph, 2)
 
         for shortest_path in shortest_path_gen:
             node_from = shortest_path[0]
-            node_from_neighbors = list(self._graph.neighbors(node_from))
-
             nodes_to = shortest_path[1]
 
             for node_to in nodes_to:
@@ -372,15 +381,66 @@ class Commonality:
                     len_path = len(nodes_to[node_to])
 
                     if len_path == 2:
-                        self._compute_commonality(node_from, node_from_neighbors, node_to, 1, self._d1_additions)
+                        self._compute_commonality(node_from, node_to, 1)
 
-                        self._k_array.append(len(node_from_neighbors))
+                        # self._k_array.append(len(node_from_neighbors))
 
                     elif len_path == 3:
-                        self._compute_commonality(node_from, node_from_neighbors, node_to, 2, self._d2_additions)
+                        self._compute_commonality(node_from, node_to, 2)
 
-        if len(self._d1_arr_for_mongo) > 0:
-            self._mongo.d1_bulk_write_update_many(self._d1_arr_for_mongo)
+        if len(self._arr_for_mongo[0]) > 0:
+            self._mongo.d1_insert_many(self._arr_for_mongo[0])
 
-        if len(self._d2_arr_for_mongo) > 0:
-            self._mongo.d2_bulk_write_update_many(self._d2_arr_for_mongo)
+        if len(self._arr_for_mongo[1]) > 0:
+            self._mongo.d2_insert_many(self._arr_for_mongo[1])
+
+    def get_random_node(self):
+        return random.choice(list(self._graph.nodes))
+
+    def _print_log(self, s):
+        if self._log:
+            print(s)
+
+    def _check_node_neighbors_for_commonality(self, node):
+        self._print_log('_check_node_neighbors_for_commonality: ' + str(node))
+        if node not in self._community_node_one:
+            self._community_node_one.append(node)
+            for node_neighbor in self._graph.neighbors(node):
+                self._print_log('_check_node_neighbors_for_commonality node_neighbor: ' + str(node_neighbor))
+                commonality_c1 = self._get_commonality(node, node_neighbor)
+                self._print_log('_check_node_neighbors_for_commonality node_neighbor commonality: ' + str(commonality_c1))
+                if commonality_c1 > self._community_c1:
+                    self._check_second_node_neighbors_for_commonality(node, node_neighbor)
+                    self._check_second_node_neighbors_for_commonality(node_neighbor, node)
+
+    def _check_second_node_neighbors_for_commonality(self, node1, node2):
+        self._print_log('_check_second_node_neighbors_for_commonality: ' + str(node1) + ' ' + str(node2))
+        if (node1, node2) not in self._community_node_two:
+            self._community_node_two.append((node1, node2))
+            for node_neighbor in self._graph.neighbors(node2):
+                self._print_log('_check_second_node_neighbors_for_commonality node_neighbor: ' + str(node_neighbor))
+                if node1 != node_neighbor and (node1 not in self._community or node2 not in self._community or node_neighbor not in self._community):
+                    commonality_c1 = self._get_commonality(node2, node_neighbor)
+                    commonality_c2 = self._get_commonality(node1, node_neighbor)
+                    self._print_log('_check_second_node_neighbors_for_commonality commonality_c1: ' + str(commonality_c1))
+                    self._print_log('_check_second_node_neighbors_for_commonality commonality_c2: ' + str(commonality_c2))
+                    if commonality_c1 > self._community_c1 and commonality_c2 > self._community_c2:
+                        if node1 not in self._community:
+                            self._community.append(node1)
+                        if node2 not in self._community:
+                            self._community.append(node2)
+                        if node_neighbor not in self._community:
+                            self._community.append(node_neighbor)
+
+                        self._check_second_node_neighbors_for_commonality(node2, node_neighbor)
+
+    def get_node_community(self, node):
+        self._community = []
+        self._community_node_one = []
+        self._community_node_two = []
+
+        self._commonality_calculation = {}
+
+        self._check_node_neighbors_for_commonality(node)
+
+        return self._community

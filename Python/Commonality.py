@@ -358,17 +358,17 @@ class Commonality:
     def _compute_commonality(self, node_from, node_to, d):
         numerator, denominator = self._calculate_commonality(node_from, node_to)
 
-        self._arr_for_mongo[d-1].append({'first': node_from, 'second': node_to, 'index': self._count[d-1], 'numerator': numerator, 'denominator': denominator})
+        self._arr_for_mongo[d - 1].append({'first': node_from, 'second': node_to, 'index': self._count[d - 1], 'numerator': numerator, 'denominator': denominator})
 
-        if len(self._arr_for_mongo[d-1]) == 1000000:
+        if len(self._arr_for_mongo[d - 1]) == 1000000:
             if d == 1:
-                self._mongo.d1_insert_many(self._arr_for_mongo[d-1])
+                self._mongo.d1_insert_many(self._arr_for_mongo[d - 1])
             elif d == 2:
-                self._mongo.d2_insert_many(self._arr_for_mongo[d-1])
+                self._mongo.d2_insert_many(self._arr_for_mongo[d - 1])
 
-            self._arr_for_mongo[d-1].clear()
+            self._arr_for_mongo[d - 1].clear()
 
-        self._count[d-1] += 1
+        self._count[d - 1] += 1
 
     def process_commonality(self):
         shortest_path_gen = nx.all_pairs_shortest_path(self._graph, 2)
@@ -394,7 +394,6 @@ class Commonality:
 
         if len(self._arr_for_mongo[1]) > 0:
             self._mongo.d2_insert_many(self._arr_for_mongo[1])
-
 
     def _print_log(self, s):
         if self._log:
@@ -452,15 +451,16 @@ class Commonality:
 
     def get_communities(self):
         while len(self._graph.nodes) > 0:
-            for t in self._graph.nodes:
-                print(t, list(self._graph.neighbors(t)))
+            # for t in self._graph.nodes:
+            #    print(t, list(self._graph.neighbors(t)))
 
             node = random.choice(list(self._graph.nodes))
             community = self.get_node_community(node)
-            print(str(node) + ": " + str(community))
+
+            print('Community: ' + str(community))
 
             for i in range(len(community)):
-                for j in range(i+1, len(community)):
+                for j in range(i + 1, len(community)):
                     if self._graph.has_edge(community[i], community[j]):
                         self._graph.remove_edge(community[i], community[j])
 
@@ -470,6 +470,3 @@ class Commonality:
             iso = list(nx.isolates(self._graph))
             for iso_node in iso:
                 self._graph.remove_node(iso_node)
-
-            print('-------')
-

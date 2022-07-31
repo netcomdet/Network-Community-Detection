@@ -1,16 +1,17 @@
 from Commonality import *
+from Community import *
 import os.path
 
-graph_file_path = os.path.dirname(__file__) + '/../Data/Amazon.txt'
-graph_delimiter = '\t'
+n = 10
+z = 4
+m = 1
+p_in = 0
+p_out = 0
+l = 0
+
+g = create_lattice(n, z, m, p_in, p_out, l)
+
+g.name = 'Test'
 executions_folder = os.path.dirname(__file__) + '/../Executions'
-
-# For loading Karate Club Graph:
-# import networkx as nx
-# graph = nx.karate_club_graph()
-# graph.name = 'Karate_Club'
-# commonality = Commonality.load_from_graph(graph, executions_folder)
-
-commonality = Commonality.load_from_file(graph_file_path, graph_delimiter, executions_folder)
-commonality.process_commonality()
-commonality.save_to_file()
+commonality = Commonality.load_from_graph(g, executions_folder, False)
+commonality.get_communities()

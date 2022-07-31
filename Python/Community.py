@@ -2,6 +2,7 @@ from Mongo import Mongo
 from pymongo import UpdateOne
 import networkx as nx
 import os
+import random
 
 
 def preprocess_community(file_path, output_folder):
@@ -152,3 +153,64 @@ def update_mongo_community(source_folder):
 
     process_d(source_folder + '1\\', m.d1_bulk_write_update_many)
     process_d(source_folder + '2\\', m.d2_bulk_write_update_many)
+
+
+def get_node_name(i, j):
+    return str(i) + '-' + str(j)
+
+
+def create_lattice(n, z, m, p_in, p_out, l):
+    if n % m != 0:
+        print('not z|m')
+        return
+    if z % 2 != 0:
+        print('not 2|z')
+        return
+
+    lattice_size = int(n / m)
+
+    g = nx.Graph()
+
+    for i in range(m):
+        for j in range(lattice_size):
+            for k in range(1, int(z / 2) + 1):
+                g.add_edge(get_node_name(i, j), get_node_name(i, (j + k) % lattice_size))
+                g.add_edge(get_node_name(i, j), get_node_name(i, (j - k) % lattice_size))
+
+        for _ in range(int(p_in * lattice_size * z/ 100)):
+            f = get_node_name(i, random.randint(0, lattice_size - 1))
+            neighbours = list(g.neighbors(str(f)))
+            fn = neighbours[random.randint(0, len(neighbours) - 1)]
+
+            t = f
+            while g.has_edge(t, f) or t == f:
+                t = get_node_name(i, random.randint(0, lattice_size - 1))
+
+            g.remove_edge(f, fn)
+            g.add_edge(f, t)
+
+    if m > 1:
+        for _ in range(int(p_out * n * z / 100)):
+            f = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+            neighbours = list(g.neighbors(str(f)))
+            fn = neighbours[random.randint(0, len(neighbours) - 1)]
+            t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+            while g.has_edge(t, f) or t == f or str(t)[0] == str(f)[0]:
+                t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+
+            g.remove_edge(f, fn)
+            g.add_edge(f, t)
+
+        for _ in range(int(l * n * z / 100)):
+            f = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+            neighbours = list(g.neighbors(str(f)))
+
+            t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+            while g.has_edge(t, f) or t == f or str(t)[0] == str(f)[0]:
+                t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+
+            g.remove_node(f)
+            for nn in neighbours:
+                g.add_edge(t, nn)
+
+    return g

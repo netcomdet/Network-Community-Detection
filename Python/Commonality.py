@@ -22,6 +22,7 @@ class Commonality:
         self._mongo = Mongo()
 
         self._log = log
+        self._log_space = 0
 
     @classmethod
     def load_from_graph(cls, graph, executions_folder, log=True):
@@ -394,14 +395,13 @@ class Commonality:
         if len(self._arr_for_mongo[1]) > 0:
             self._mongo.d2_insert_many(self._arr_for_mongo[1])
 
-    def get_random_node(self):
-        return random.choice(list(self._graph.nodes))
 
     def _print_log(self, s):
         if self._log:
-            print(s)
+            print(' ' * self._log_space + s)
 
     def _check_node_neighbors_for_commonality(self, node):
+        self._log_space += 1
         self._print_log('_check_node_neighbors_for_commonality: ' + str(node))
         if node not in self._community_node_one:
             self._community_node_one.append(node)
@@ -412,8 +412,10 @@ class Commonality:
                 if commonality_c1 > self._community_c1:
                     self._check_second_node_neighbors_for_commonality(node, node_neighbor)
                     self._check_second_node_neighbors_for_commonality(node_neighbor, node)
+        self._log_space -= 1
 
     def _check_second_node_neighbors_for_commonality(self, node1, node2):
+        self._log_space += 1
         self._print_log('_check_second_node_neighbors_for_commonality: ' + str(node1) + ' ' + str(node2))
         if (node1, node2) not in self._community_node_two:
             self._community_node_two.append((node1, node2))
@@ -425,6 +427,7 @@ class Commonality:
                     self._print_log('_check_second_node_neighbors_for_commonality commonality_c1: ' + str(commonality_c1))
                     self._print_log('_check_second_node_neighbors_for_commonality commonality_c2: ' + str(commonality_c2))
                     if commonality_c1 > self._community_c1 and commonality_c2 > self._community_c2:
+                        self._print_log('_check_second_node_neighbors_for_commonality inside if')
                         if node1 not in self._community:
                             self._community.append(node1)
                         if node2 not in self._community:
@@ -433,6 +436,8 @@ class Commonality:
                             self._community.append(node_neighbor)
 
                         self._check_second_node_neighbors_for_commonality(node2, node_neighbor)
+
+        self._log_space -= 1
 
     def get_node_community(self, node):
         self._community = []
@@ -444,3 +449,27 @@ class Commonality:
         self._check_node_neighbors_for_commonality(node)
 
         return self._community
+
+    def get_communities(self):
+        while len(self._graph.nodes) > 0:
+            for t in self._graph.nodes:
+                print(t, list(self._graph.neighbors(t)))
+
+            node = random.choice(list(self._graph.nodes))
+            community = self.get_node_community(node)
+            print(str(node) + ": " + str(community))
+
+            for i in range(len(community)):
+                for j in range(i+1, len(community)):
+                    if self._graph.has_edge(community[i], community[j]):
+                        self._graph.remove_edge(community[i], community[j])
+
+            if not self._community:
+                self._graph.remove_node(node)
+
+            iso = list(nx.isolates(self._graph))
+            for iso_node in iso:
+                self._graph.remove_node(iso_node)
+
+            print('-------')
+

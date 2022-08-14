@@ -2,15 +2,30 @@ from Utils import *
 
 
 class Community:
-    def __init__(self, g, c1, c2):
-        self._graph = g.copy()
-        self._c1 = c1
-        self._c2 = c2
+    def __init__(self):
+        self._graph = None
 
         self._community = []
         self._commonality_calculation = {}
 
         self._log_space = 0
+
+        self._reccursion_stack = []
+        self._pair_checked = []
+
+    def _init_graph(self, g):
+        self._graph = g.copy()
+        self._set_threshold()
+
+    def _set_threshold(self):
+        s = 0
+        count = 0
+        for n in list(self._graph.nodes):
+            for n_n in self._graph.neighbors(n):
+                s += self._get_commonality(n, n_n)
+                count += 1
+
+        self._commonality_threshold = (s / count) * 0.7
 
     def _get_commonality(self, node1, node2):
         if node1 > node2:
@@ -26,50 +41,66 @@ class Community:
 
         return self._commonality_calculation[(min_node, max_node)]
 
+    def _run_reccursion(self):
+        while self._reccursion_stack:
+            # print(self._t)
+            args = self._reccursion_stack.pop()
+            # print(str(func))
+            self._check_second_node_neighbors_for_commonality(args[0], args[1])
+
     def get_node_community(self, node):
         self._community = []
-        print_log('_check_node_neighbors_for_commonality: ' + str(node), self._log_space)
+        self._pair_checked = []
+        print_log('get_node_community node_neighbor: ' + str(node))
         for node_neighbor in self._graph.neighbors(node):
-            print_log('_check_node_neighbors_for_commonality node_neighbor: ' + str(node_neighbor), self._log_space)
-            commonality_c1 = self._get_commonality(node, node_neighbor)
-            print_log('_check_node_neighbors_for_commonality node_neighbor commonality: ' + str(commonality_c1), self._log_space)
-            if commonality_c1 > self._c1:
-                self._check_second_node_neighbors_for_commonality(node, node_neighbor)
-                self._check_second_node_neighbors_for_commonality(node_neighbor, node)
+            if not self._community:
+                print_log('get_node_community node_neighbor: ' + str(node_neighbor))
+                commonality = self._get_commonality(node, node_neighbor)
+                print_log('get_node_community node_neighbor commonality: ' + str(commonality))
+                if commonality > self._commonality_threshold:
+                    self._reccursion_stack.append([node, node_neighbor])
+                    self._reccursion_stack.append([node_neighbor, node])
+
+                    self._run_reccursion()
 
         return self._community
 
     def _check_second_node_neighbors_for_commonality(self, node1, node2):
-        self._log_space += 1
-        print_log('_check_second_node_neighbors_for_commonality: ' + str(node1) + ' ' + str(node2), self._log_space)
-        for node_neighbor in self._graph.neighbors(node2):
-            print_log('_check_second_node_neighbors_for_commonality node_neighbor: ' + str(node_neighbor), self._log_space)
-            if node1 != node_neighbor and (node1 not in self._community or node2 not in self._community or node_neighbor not in self._community):
-                commonality_c1 = self._get_commonality(node2, node_neighbor)
-                commonality_c2 = self._get_commonality(node1, node_neighbor)
-                print_log('_check_second_node_neighbors_for_commonality commonality_c1: ' + str(commonality_c1), self._log_space)
-                print_log('_check_second_node_neighbors_for_commonality commonality_c2: ' + str(commonality_c2), self._log_space)
-                if commonality_c1 > self._c1 and commonality_c2 > self._c2:
-                    print_log('_check_second_node_neighbors_for_commonality inside if', self._log_space)
-                    if node1 not in self._community:
-                        self._community.append(node1)
-                    if node2 not in self._community:
-                        self._community.append(node2)
-                    if node_neighbor not in self._community:
-                        self._community.append(node_neighbor)
+        if (node1, node2) not in self._pair_checked:
+            self._pair_checked.append((node1, node2))
+            self._log_space += 1
+            print_log('_check_second_node_neighbors_for_commonality: ' + str(node1) + ' ' + str(node2))
+            for node_neighbor in self._graph.neighbors(node2):
+                print_log('_check_second_node_neighbors_for_commonality node_neighbor: ' + str(node_neighbor))
+                if node1 != node_neighbor:
+                    commonality_d1 = self._get_commonality(node2, node_neighbor)
+                    commonality_d2 = self._get_commonality(node1, node_neighbor)
+                    print_log('_check_second_node_neighbors_for_commonality commonality: ' + str(commonality_d1))
+                    print_log('_check_second_node_neighbors_for_commonality commonality: ' + str(commonality_d2))
+                    if commonality_d1 > self._commonality_threshold and commonality_d2 > self._commonality_threshold:
+                        print_log('_check_second_node_neighbors_for_commonality inside if')
+                        if node1 not in self._community:
+                            self._community.append(node1)
+                        if node2 not in self._community:
+                            self._community.append(node2)
+                        if node_neighbor not in self._community:
+                            self._community.append(node_neighbor)
 
-                    self._check_second_node_neighbors_for_commonality(node2, node_neighbor)
+                        self._reccursion_stack.append([node2, node_neighbor])
 
         self._log_space -= 1
 
-    def get_communities(self):
+    def get_communities(self, g):
+        self._init_graph(g)
+
         temp = self._graph.copy()
         communities = []
         while len(self._graph.nodes) > 0:
             node = random.choice(list(self._graph.nodes))
+
             community = self.get_node_community(node)
 
-            if not self._community:
+            if not community:
                 self._graph.remove_node(node)
             else:
                 communities.append(community)
@@ -82,6 +113,6 @@ class Community:
             for iso_node in iso:
                 self._graph.remove_node(iso_node)
 
-        self._graph = temp.copy()
+        self._graph = temp
 
         return communities

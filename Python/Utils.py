@@ -5,8 +5,8 @@ import os
 from Mongo import Mongo
 from pymongo import UpdateOne
 
-
 PRINT_LOG = False
+
 
 def check_folder(folder_name):
     if not os.path.exists(folder_name):
@@ -195,13 +195,21 @@ def create_lattice(n, z, m, p_in, p_out, l):
 
     g = nx.Graph()
 
-    for i in range(m):
-        for j in range(lattice_size):
-            for k in range(1, int(z / 2) + 1):
-                g.add_edge(get_node_name_for_lattice(i, j), get_node_name_for_lattice(i, (j + k) % lattice_size))
-                g.add_edge(get_node_name_for_lattice(i, j), get_node_name_for_lattice(i, (j - k) % lattice_size))
+    ground_truth = []
 
-        for _ in range(int(p_in * lattice_size * z/ 100)):
+    for i in range(m):
+        lattice_ground_truth = []
+
+        for j in range(lattice_size):
+            current_node = get_node_name_for_lattice(i, j)
+            lattice_ground_truth.append(current_node)
+
+            for k in range(1, int(z / 2) + 1):
+                g.add_edge(current_node, get_node_name_for_lattice(i, (j + k) % lattice_size))
+
+        ground_truth.append(lattice_ground_truth)
+
+        for _ in range(int(p_in * lattice_size * z / 100)):
             f = get_node_name_for_lattice(i, random.randint(0, lattice_size - 1))
             neighbours = list(g.neighbors(str(f)))
             fn = neighbours[random.randint(0, len(neighbours) - 1)]
@@ -225,7 +233,7 @@ def create_lattice(n, z, m, p_in, p_out, l):
             g.remove_edge(f, fn)
             g.add_edge(f, t)
 
-        for _ in range(int(l * n * z / 100)):
+        for _ in range(int(l * n / 100)):
             f = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
             neighbours = list(g.neighbors(str(f)))
 
@@ -234,12 +242,106 @@ def create_lattice(n, z, m, p_in, p_out, l):
                 t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
 
             g.remove_node(f)
+
             for nn in neighbours:
                 g.add_edge(t, nn)
 
-    return g
+    attributes = {'n': n, 'z': z, 'm': m}
+    g.graph.update(attributes)
+
+    return g, ground_truth
 
 
-def print_log(s, indent):
+def randomize_lattice(g, p_in, p_out, l):
+    n = g.graph['n']
+    z = g.graph['z']
+    m = g.graph['m']
+
+    lattice_size = int(n / m)
+
+    for i in range(m):
+        for _ in range(int(p_in * lattice_size * z / 100)):
+            neighbours = []
+            while len(neighbours) == 0:
+                while True:
+                    f = get_node_name_for_lattice(i, random.randint(0, lattice_size - 1))
+                    if f in list(g.nodes):
+                        break
+                neighbours = list(g.neighbors(str(f)))
+            fn = neighbours[random.randint(0, len(neighbours) - 1)]
+
+            t = f
+            while g.has_edge(t, f) or t == f:
+                t = get_node_name_for_lattice(i, random.randint(0, lattice_size - 1))
+
+            g.remove_edge(f, fn)
+            g.add_edge(f, t)
+
+    if m > 1:
+        for _ in range(int(p_out * n * z / 100)):
+            neighbours = []
+            while len(neighbours) == 0:
+                f = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+                neighbours = list(g.neighbors(str(f)))
+            fn = neighbours[random.randint(0, len(neighbours) - 1)]
+            t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+            while g.has_edge(t, f) or t == f or str(t)[0] == str(f)[0]:
+                t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+
+            g.remove_edge(f, fn)
+            g.add_edge(f, t)
+
+        for _ in range(int(l * n / 100)):
+            f = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+            neighbours = list(g.neighbors(str(f)))
+
+            t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+            while g.has_edge(t, f) or t == f or str(t)[0] == str(f)[0]:
+                t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+
+            g.remove_node(f)
+
+            for nn in neighbours:
+                g.add_edge(t, nn)
+
+
+def print_log(s):
     if PRINT_LOG:
-        print(' ' * indent + s)
+        # print(' ' * indent + s)
+        print(s)
+
+
+def adjusted_rand_index(ground_truth, communities, nodes_number):
+    n = 0
+    a = 0
+    b = 0
+
+    b_list = [0] * len(communities)
+
+    for x in ground_truth:
+        a_i = 0
+
+        for y_index in range(len(communities)):
+            n_i = 0
+
+            for i in range(len(x)):
+                if x[i] in communities[y_index]:
+                    n_i += 1
+
+            n += n_i * (n_i - 1) / 2
+            a_i += n_i
+            b_list[y_index] += n_i
+
+        a += a_i * (a_i - 1) / 2
+
+    for b_i in b_list:
+        b += b_i * (b_i - 1) / 2
+
+    right = (a * b) / (nodes_number * (nodes_number - 1) / 2)
+    nominator = (n - right)
+    denominator = ((a + b) / 2) - right
+
+    if nominator == 0 and denominator == 0:
+        return 1
+
+    return nominator / denominator

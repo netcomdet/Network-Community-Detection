@@ -9,16 +9,13 @@ from datetime import datetime
 
 
 class Commonality:
-    def __init__(self, log):
+    def __init__(self):
         self._graph = nx.Graph()
         self._mongo = Mongo()
 
-        self._log = log
-        self._log_space = 0
-
     @classmethod
-    def load_from_graph(cls, graph, executions_folder, log=True):
-        commonality = cls(log)
+    def load_from_graph(cls, graph, executions_folder):
+        commonality = cls()
 
         commonality._graph = graph
 
@@ -30,8 +27,8 @@ class Commonality:
         return commonality
 
     @classmethod
-    def load_from_file(cls, graph_file_path, graph_delimiter, executions_folder, log=True):
-        commonality = cls(log)
+    def load_from_file(cls, graph_file_path, graph_delimiter, executions_folder):
+        commonality = cls()
 
         file = open(graph_file_path, 'r')
 
@@ -67,9 +64,9 @@ class Commonality:
 
         self._arr_for_mongo = [[], []]
 
-        self._community_graph = nx.Graph()
+        # self._community_graph = nx.Graph()
 
-        self._k_array = []
+        # self._k_array = []
 
     def _save_d(self, d_list, d):
         file_name_txt = self._graph.name + '_D=' + str(d) + '.txt'
@@ -78,12 +75,13 @@ class Commonality:
         file_txt = open(self._output_path + '/' + file_name_txt, 'a+')
         file_csv = open(self._output_path + '/' + file_name_csv, 'a+')
 
-        file_csv.write('Node1, Node2, Commonality (Union), Inner/Outer\n')
+        file_csv.write('Node1, Node2, Commonality, Inner/Outer\n')
 
         for d_row in d_list:
             node1 = str(d_row['first'])
             node2 = str(d_row['second'])
-            commonality_union = str(round(d_row['commonality_union'], 3))
+
+            commonality = str(round(d_row['numerator'] / d_row['denominator'], 3))
 
             is_inner_txt = ''
             is_inner_csv = ''
@@ -91,18 +89,18 @@ class Commonality:
             if 'is_inner' in d_row:
                 if d_row['is_inner'] == 1:
                     is_inner_txt = '\tIs Inner: Yes'
-                    is_inner_csv = 'Inner'
+                    is_inner_csv = ',Inner'
                 else:
                     is_inner_txt = '\tIs Inner: No'
-                    is_inner_csv = 'Outer'
+                    is_inner_csv = ',Outer'
 
-            file_txt.write('Nodes: (' + node1 + ', ' + node2 + ')\tCommonality: Union = ' + commonality_union + is_inner_txt + '\n')
-            file_csv.write(node1 + ', ' + node2 + ', ' + commonality_union + is_inner_csv + '\n')
+            file_txt.write('Nodes: (' + node1 + ', ' + node2 + ')\tCommonality = ' + commonality + is_inner_txt + '\n')
+            file_csv.write(node1 + ',' + node2 + ',' + commonality + is_inner_csv + '\n')
 
         file_txt.close()
         file_csv.close()
 
-    def _save_distribution(self, values_arr, d, column_name):
+    def _save_distribution(self, values_arr, d):
         plt.clf()
 
         counts, bins = np.histogram(values_arr, bins=np.arange(0, 1, 0.01))
@@ -112,34 +110,34 @@ class Commonality:
         plt.xticks(np.arange(0, 1, 0.01))
         plt.xlabel('Value')
         plt.ylabel('Frequency')
-        plt.title('Distribution D=' + str(d) + ', Compute By=' + column_name)
+        plt.title('Distribution D=' + str(d))
 
         folder_name = 'Distribution'
         check_folder(self._output_path + '/' + folder_name)
 
-        plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Distribution_D=' + str(d) + '_' + column_name + '.png')
+        plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Distribution_D=' + str(d) + '.png')
 
-    def _save_arr_k_compare(self, values_arr, k_big_arr, k_small_arr, d, column_name):
+    def _save_arr_k_compare(self, values_arr, k_big_arr, k_small_arr, d):
         folder_name = 'Compare_To_K'
         check_folder(self._output_path + '/' + folder_name)
 
         plt.clf()
         plt.plot(values_arr, k_big_arr, 'bo', ms=1)
 
-        plt.title(column_name + ' vs K Bigger, D=' + str(d) + ', Data=all', fontsize=18)
-        plt.xlabel('Values By ' + column_name, fontsize=18)
+        plt.title('Commonality vs K Bigger, D=' + str(d) + ', Data=all', fontsize=18)
+        plt.xlabel('Commonality', fontsize=18)
         plt.ylabel('K Bigger', fontsize=18)
 
-        plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Compare_' + column_name + '_K_Bigger_All_D=' + str(d) + '.png')
+        plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Compare_K_Bigger_All_D=' + str(d) + '.png')
 
         plt.clf()
         plt.plot(values_arr, k_small_arr, 'bo', ms=1)
 
-        plt.title(column_name + ' vs K Smaller, D=' + str(d) + ', Data=all', fontsize=18)
-        plt.xlabel('Values By ' + column_name, fontsize=18)
+        plt.title('Commonality vs K Smaller, D=' + str(d) + ', Data=all', fontsize=18)
+        plt.xlabel('Commonality', fontsize=18)
         plt.ylabel('K Smaller', fontsize=18)
 
-        plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Compare_' + column_name + '_K_Smaller_All_D=' + str(d) + '.png')
+        plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Compare_K_Smaller_All_D=' + str(d) + '.png')
 
         values_arr = values_arr[:1000]
         k_big_arr = k_big_arr[:1000]
@@ -148,24 +146,24 @@ class Commonality:
         plt.clf()
         plt.plot(values_arr, k_big_arr, 'bo', ms=1)
 
-        plt.title(column_name + ' vs K Bigger, D=' + str(d) + ', Data=1000', fontsize=18)
-        plt.xlabel('Values By ' + column_name, fontsize=18)
+        plt.title('Commonality vs K Bigger, D=' + str(d) + ', Data=1000', fontsize=18)
+        plt.xlabel('Commonality', fontsize=18)
         plt.ylabel('K Bigger', fontsize=18)
 
-        plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Compare_' + column_name + '_K_Bigger_1000_D=' + str(d) + '.png')
+        plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Compare_K_Bigger_1000_D=' + str(d) + '.png')
 
         plt.clf()
         plt.plot(values_arr, k_small_arr, 'bo', ms=1)
 
-        plt.title(column_name + ' vs K Smaller, D=' + str(d) + ', Data=1000', fontsize=18)
-        plt.xlabel('Values By ' + column_name, fontsize=18)
+        plt.title('Commonality vs K Smaller, D=' + str(d) + ', Data=1000', fontsize=18)
+        plt.xlabel('Commonality', fontsize=18)
         plt.ylabel('K Smaller', fontsize=18)
 
-        plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Compare_' + column_name + '_K_Smaller_1000_D=' + str(d) + '.png')
+        plt.savefig(self._output_path + '/' + folder_name + '/' + self._graph.name + '_Compare_K_Smaller_1000_D=' + str(d) + '.png')
 
     def _box_plot(self, df, title, folder_name, file_name):
 
-        values_arr = df['calculation'].tolist()
+        # values_arr = df['calculation'].tolist()
 
         inner_df = df[df['is_inner'] == 1][['calculation']]
         outer_df = df[df['is_inner'] == 0][['calculation']]
@@ -173,41 +171,48 @@ class Commonality:
         values_inner_arr = inner_df['calculation'].tolist()
         values_outer_arr = outer_df['calculation'].tolist()
 
-        data = [values_arr, values_inner_arr, values_outer_arr]
+        # data = [values_arr, values_inner_arr, values_outer_arr]
+        data = [values_inner_arr, values_outer_arr]
 
         plt.clf()
 
-        plt.boxplot(data, showfliers=False)
+        # plt.boxplot(data, showfliers=False) - with outliers
+        plt.boxplot(data)
         plt.title(title, fontsize=18)
-        plt.xticks([1, 2, 3], ['All Data', 'Inner', 'Outer'])
+        # plt.xticks([1, 2, 3], ['All Data', 'Inner', 'Outer'])
+        plt.xticks([1, 2], ['In Community', 'Not In Community'])
 
         check_folder(folder_name)
 
         plt.savefig(folder_name + '/' + file_name)
 
-    def _box_plot_k(self, df, d, mean, median):
-        df['calculation'] = (df['numerator'] ** 2) / (df['denominator_union'] * mean)
+    def _box_plot_k(self, df, d, k_mean, k_median):
+        df['calculation'] = (df['numerator'] ** 2) / (df['denominator'] * mean)
 
-        mean_str = str(format(mean, '.2f'))
+        k_mean_str = str(format(k_mean, '.2f'))
 
-        title = 'Box Plot Mean=' + mean_str + ' D=' + str(d)
+        title = 'Box Plot Mean=' + k_mean_str + ' D=' + str(d)
         folder_name = self._output_path + '/' + 'Box_Plot'
-        file_name = self._graph.name + '_Box_Plot_Mean=' + mean_str + '_D=' + str(d) + '.png'
+        file_name = self._graph.name + '_Box_Plot_Mean=' + k_mean_str + '_D=' + str(d) + '.png'
 
         self._box_plot(df, title, folder_name, file_name)
 
-        df['calculation'] = (df['numerator'] ** 2) / (df['denominator_union'] * median)
+        df['calculation'] = (df['numerator'] ** 2) / (df['denominator'] * k_median)
 
-        title = 'Box Plot Median=' + str(median) + ' D=' + str(d)
+        title = 'Box Plot Median=' + str(k_median) + ' D=' + str(d)
         folder_name = self._output_path + '/' + 'Box_Plot'
-        file_name = self._graph.name + '_Box_Plot_Median=' + str(median) + '_D=' + str(d) + '.png'
+        file_name = self._graph.name + '_Box_Plot_Median=' + str(k_median) + '_D=' + str(d) + '.png'
 
         self._box_plot(df, title, folder_name, file_name)
 
     def _box_plot_ab(self, df, d, a, b):
-        df['calculation'] = (df['numerator'] ** a) / (df['denominator_union'] ** b)
+        df['calculation'] = (df['numerator'] ** a) / (df['denominator'] ** b)
 
-        title = 'Box Plot a=' + str(a) + ' b=' + str(b) + ' D=' + str(d)
+        # title = 'Box Plot a=' + str(a) + ' b=' + str(b) + ' D=' + str(d)
+        if d == 1:
+            title = 'A. Commonality Box Plot Distance = ' + str(d)
+        else:
+            title = 'B. Commonality Box Plot Distance = ' + str(d)
         folder_name = self._output_path + '/' + 'Box_Plot'
         file_name = self._graph.name + '_Box_Plot_a=' + str(a) + '_b=' + str(b) + '_D=' + str(d) + '.png'
 
@@ -219,33 +224,33 @@ class Commonality:
         df = pd.DataFrame(d_list)
 
         if 'is_inner' in df.columns:
-            self._box_plot_ab(df, d, 2, 2)
+            ''''self._box_plot_ab(df, d, 2, 2)
             self._box_plot_ab(df, d, 2, 1)
             self._box_plot_ab(df, d, 2, 0)
 
-            self._box_plot_ab(df, d, 1, 2)
+            self._box_plot_ab(df, d, 1, 2)'''
             self._box_plot_ab(df, d, 1, 1)
-            self._box_plot_ab(df, d, 1, 0)
+            '''self._box_plot_ab(df, d, 1, 0)
 
             self._box_plot_ab(df, d, 0, 2)
             self._box_plot_ab(df, d, 0, 1)
-            self._box_plot_ab(df, d, 0, 0)
+            self._box_plot_ab(df, d, 0, 0)'''
 
-            self._box_plot_k(df, d, mean(self._k_array), median(self._k_array))
+            # self._box_plot_k(df, d, mean(self._k_array), median(self._k_array))
 
         count_for_avg = 1
 
-        avg_union_list = []
+        avg_list = []
 
         k_big_arr = []
         k_small_arr = []
 
-        avg_union_total = 0
+        avg_total = 0
 
         for d_row in d_list:
-            avg_union_total = avg_union_total + d_row['commonality_union']
+            avg_total += d_row['numerator'] / d_row['denominator']
 
-            avg_union_list.append(avg_union_total / count_for_avg)
+            avg_list.append(avg_total / count_for_avg)
 
             count_for_avg = count_for_avg + 1
 
@@ -261,11 +266,11 @@ class Commonality:
 
         d_list.clear()
 
-        values_union_arr = df['commonality_union']
+        values_arr = df['numerator'] / df['denominator']
 
-        self._save_arr_k_compare(values_union_arr, k_big_arr, k_small_arr, d, 'union')
+        self._save_arr_k_compare(values_arr, k_big_arr, k_small_arr, d)
 
-        self._save_distribution(values_union_arr, d, 'union')
+        self._save_distribution(values_arr, d)
 
     def _process_d(self, d_list, d):
         self._save_d(d_list, d)
@@ -344,8 +349,6 @@ class Commonality:
 
                     if len_path == 2:
                         self._compute_commonality(node_from, node_to, 1)
-
-                        # self._k_array.append(len(node_from_neighbors))
 
                     elif len_path == 3:
                         self._compute_commonality(node_from, node_to, 2)

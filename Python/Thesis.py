@@ -1,40 +1,40 @@
-# from Commonality import *
-import networkx as nx
-
 from Community import *
-from Utils import PRINT_LOG
-import os.path
 
-n = 10
-z = 4
-m = 1
-p_in = 10
-p_out = 20
-l = 5
+y = []
 
-g, ground_truth = create_lattice(n, z, m, p_in, p_out, l)
-# print(ground_truth)
-# g.name = 'Test'
-# executions_folder = os.path.dirname(__file__) + '/../Executions'
-# commonality = Commonality.load_from_graph(g, executions_folder, False)
-# commonality.get_communities()
+for i in range(21):
+    y.append(i)
 
-community = Community()
-c = []
-rand_index = []
-for i in range(1):
-    # print(i)
-    # for n in g.nodes:
-#        print(n, list(g.neighbors(n)))
-    communities = community.get_communities(g)
-    c.append(communities)
-    # for cc in communities:
-#        print(cc)
-    rand_index.append(adjusted_rand_index(ground_truth, communities, len(g.nodes)))
- #   print('adjusted_rand_index ', adjusted_rand_index(ground_truth, communities, len(g.nodes)))
-    randomize_lattice(g, 10, 10, 5)
-  #  print('---------')
+# different = [(100, 4, 2), (100, 8, 2), (500, 16, 2), (500, 16, 5), (500, 16, 10), (1000, 16, 5), (1000, 32, 5), (1000, 32, 8), (5000, 32, 10), (5000, 64, 10)]
+different = [(5000, 64, 10)]
 
-for i in range(len(rand_index)):
-    print(rand_index[i])
-    print(c[i])
+
+def lattice_similarity(n, z, m, p_in, p_out, l, iterations):
+    g, ground_truth = create_lattice(n, z, m, p_in, p_out, l)
+    print('1')
+    community = Community(g)
+    nodes_number = len(g.nodes)
+    y = list(range(iterations+1))
+    similarity_list = []
+
+    communities = community.get_communities()
+    print('2')
+    similarity_list.append(get_similarity(communities, ground_truth, nodes_number))
+    print('3')
+
+    for i in range(iterations):
+        print(i)
+        randomize_lattice(g, 5, 5, 0)
+
+        communities = community.get_communities()
+        similarity_list.append(get_similarity(communities, ground_truth, nodes_number))
+
+    plt.clf()
+    plt.xticks(range(0, 21, 1))
+    plt.plot(y, similarity_list)
+    plt.title('n=' + str(n) + ' z=' + str(z) + ' m=' + str(m), fontsize=18)
+    plt.savefig('Similarity_n=' + str(n) + ' z=' + str(z) + ' m=' + str(m) + '.png')
+
+
+for different_item in different:
+    lattice_similarity(different_item[0], different_item[1], different_item[2], 0, 0, 2, 20)

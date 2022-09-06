@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import networkx as nx
 import random
 import os
@@ -183,6 +184,70 @@ def get_node_name_for_lattice(i, j):
     return str(i) + '-' + str(j)
 
 
+def randomize_in(g, p_in, i, lattice_size, z):
+    for _ in range(int(p_in * lattice_size * (z / 2) / 100)):
+        neighbours = []
+        while len(neighbours) == 0:
+            while True:
+                f = get_node_name_for_lattice(i, random.randint(0, lattice_size - 1))
+                if f in list(g.nodes):
+                    break
+            neighbours = []
+            for n in list(g.neighbors(str(f))):
+                if str(n)[0] == str(i):
+                    neighbours.append(n)
+
+        fn = neighbours[random.randint(0, len(neighbours) - 1)]
+
+        t = f
+
+        while g.has_edge(t, f) or t == f:
+            t = get_node_name_for_lattice(i, random.randint(0, lattice_size - 1))
+
+        g.remove_edge(f, fn)
+        g.add_edge(f, t)
+
+
+def randomize_out(g, p_out, n, z):
+    for _ in range(int(p_out * n * (z / 2) / 100)):
+        neighbours = []
+
+        while len(neighbours) == 0:
+            f = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+            neighbours = list(g.neighbors(str(f)))
+
+        fn = neighbours[random.randint(0, len(neighbours) - 1)]
+
+        t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+
+        while g.has_edge(t, f) or t == f or str(t)[0] == str(f)[0]:
+            t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+
+        g.remove_edge(f, fn)
+        g.add_edge(f, t)
+
+
+def create_overlap(g, l, n):
+    nodes_removed = []
+
+    for _ in range(int(l * n / 100)):
+        f = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+        neighbours = list(g.neighbors(str(f)))
+
+        t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+        while g.has_edge(t, f) or t == f or str(t)[0] == str(f)[0]:
+            t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+
+        g.remove_node(f)
+
+        for nn in neighbours:
+            g.add_edge(t, nn)
+
+        nodes_removed.append(f)
+
+    return nodes_removed
+
+
 def create_lattice(n, z, m, p_in, p_out, l):
     if n % m != 0:
         print('not z|m')
@@ -209,42 +274,17 @@ def create_lattice(n, z, m, p_in, p_out, l):
 
         ground_truth.append(lattice_ground_truth)
 
-        for _ in range(int(p_in * lattice_size * z / 100)):
-            f = get_node_name_for_lattice(i, random.randint(0, lattice_size - 1))
-            neighbours = list(g.neighbors(str(f)))
-            fn = neighbours[random.randint(0, len(neighbours) - 1)]
-
-            t = f
-            while g.has_edge(t, f) or t == f:
-                t = get_node_name_for_lattice(i, random.randint(0, lattice_size - 1))
-
-            g.remove_edge(f, fn)
-            g.add_edge(f, t)
+        for _ in range(int(p_in * lattice_size * (z / 2) / 100)):
+            randomize_in(g, p_in, i, lattice_size, z)
 
     if m > 1:
-        for _ in range(int(p_out * n * z / 100)):
-            f = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
-            neighbours = list(g.neighbors(str(f)))
-            fn = neighbours[random.randint(0, len(neighbours) - 1)]
-            t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
-            while g.has_edge(t, f) or t == f or str(t)[0] == str(f)[0]:
-                t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+        randomize_out(g, p_out, n, z)
 
-            g.remove_edge(f, fn)
-            g.add_edge(f, t)
+        if l > 0:
+            nodes_removed = create_overlap(g, l, n)
 
-        for _ in range(int(l * n / 100)):
-            f = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
-            neighbours = list(g.neighbors(str(f)))
-
-            t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
-            while g.has_edge(t, f) or t == f or str(t)[0] == str(f)[0]:
-                t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
-
-            g.remove_node(f)
-
-            for nn in neighbours:
-                g.add_edge(t, nn)
+            for node_removed in nodes_removed:
+                ground_truth[int(node_removed.split('-')[0])].remove(node_removed)
 
     attributes = {'n': n, 'z': z, 'm': m}
     g.graph.update(attributes)
@@ -260,49 +300,12 @@ def randomize_lattice(g, p_in, p_out, l):
     lattice_size = int(n / m)
 
     for i in range(m):
-        for _ in range(int(p_in * lattice_size * z / 100)):
-            neighbours = []
-            while len(neighbours) == 0:
-                while True:
-                    f = get_node_name_for_lattice(i, random.randint(0, lattice_size - 1))
-                    if f in list(g.nodes):
-                        break
-                neighbours = list(g.neighbors(str(f)))
-            fn = neighbours[random.randint(0, len(neighbours) - 1)]
-
-            t = f
-            while g.has_edge(t, f) or t == f:
-                t = get_node_name_for_lattice(i, random.randint(0, lattice_size - 1))
-
-            g.remove_edge(f, fn)
-            g.add_edge(f, t)
+        randomize_in(g, p_in, i, lattice_size, z)
 
     if m > 1:
-        for _ in range(int(p_out * n * z / 100)):
-            neighbours = []
-            while len(neighbours) == 0:
-                f = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
-                neighbours = list(g.neighbors(str(f)))
-            fn = neighbours[random.randint(0, len(neighbours) - 1)]
-            t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
-            while g.has_edge(t, f) or t == f or str(t)[0] == str(f)[0]:
-                t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+        randomize_out(g, p_out, n, z)
 
-            g.remove_edge(f, fn)
-            g.add_edge(f, t)
-
-        for _ in range(int(l * n / 100)):
-            f = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
-            neighbours = list(g.neighbors(str(f)))
-
-            t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
-            while g.has_edge(t, f) or t == f or str(t)[0] == str(f)[0]:
-                t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
-
-            g.remove_node(f)
-
-            for nn in neighbours:
-                g.add_edge(t, nn)
+        create_overlap(g, l, n)
 
 
 def print_log(s):
@@ -311,37 +314,37 @@ def print_log(s):
         print(s)
 
 
-def adjusted_rand_index(ground_truth, communities, nodes_number):
-    n = 0
-    a = 0
-    b = 0
+def get_similarity(ground_truth, communities, nodes_number):
+    delta = 0
+    for c in communities:
+        c_set = set(c)
 
-    b_list = [0] * len(communities)
+        max_index = -1
+        max_intersection = 0
+        max_intersection_len = 0
 
-    for x in ground_truth:
-        a_i = 0
+        for i in range(len(ground_truth)):
+            current_intersection = c_set.intersection(ground_truth[i])
+            current_intersection_len = len(current_intersection)
+            if len(current_intersection) > max_intersection_len:
+                max_index = i
+                max_intersection = current_intersection
+                max_intersection_len = current_intersection_len
 
-        for y_index in range(len(communities)):
-            n_i = 0
+        t = list((c_set | set(ground_truth[max_index])) - max_intersection)
 
-            for i in range(len(x)):
-                if x[i] in communities[y_index]:
-                    n_i += 1
+        delta += len(t)
 
-            n += n_i * (n_i - 1) / 2
-            a_i += n_i
-            b_list[y_index] += n_i
+    return 1 - (delta / nodes_number)
 
-        a += a_i * (a_i - 1) / 2
 
-    for b_i in b_list:
-        b += b_i * (b_i - 1) / 2
+def print_communities(communities):
+    for c in communities:
+        print(c)
 
-    right = (a * b) / (nodes_number * (nodes_number - 1) / 2)
-    nominator = (n - right)
-    denominator = ((a + b) / 2) - right
 
-    if nominator == 0 and denominator == 0:
-        return 1
+def draw(g):
+    nx.draw(g, with_labels=True)
 
-    return nominator / denominator
+    plt.draw()
+    plt.show()

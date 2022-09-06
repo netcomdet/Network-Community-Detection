@@ -5,7 +5,7 @@ class Mongo:
     def __init__(self):
         self._db = MongoClient('192.168.108.101').thesis
 
-        """self._db.d1.drop()
+        '''self._db.d1.drop()
         self._db.d2.drop()
 
         self._db.d1.create_index([
@@ -24,7 +24,7 @@ class Mongo:
 
         self._db.d2.create_index([
             ('index', 1)
-        ], unique=True)"""
+        ], unique=True)'''
 
     def d1_insert_many(self, insert_list):
         self._db.d1.insert_many(insert_list)

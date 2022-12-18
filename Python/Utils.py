@@ -243,7 +243,7 @@ def create_overlap(g, l, n):
         for nn in neighbours:
             g.add_edge(t, nn)
 
-        nodes_removed.append(f)
+        nodes_removed.append((f, t))
 
     return nodes_removed
 
@@ -284,7 +284,10 @@ def create_lattice(n, z, m, p_in, p_out, l):
             nodes_removed = create_overlap(g, l, n)
 
             for node_removed in nodes_removed:
-                ground_truth[int(node_removed.split('-')[0])].remove(node_removed)
+                for community in ground_truth:
+                    if node_removed[0] in community:
+                        community.remove(node_removed[0])
+                        community.append(node_removed[1])
 
     attributes = {'n': n, 'z': z, 'm': m}
     g.graph.update(attributes)

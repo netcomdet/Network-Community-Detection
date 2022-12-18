@@ -5,6 +5,7 @@ class Mongo:
     def __init__(self):
         self._db = MongoClient('192.168.108.101').thesis
 
+        # never use here
         '''self._db.d1.drop()
         self._db.d2.drop()
 

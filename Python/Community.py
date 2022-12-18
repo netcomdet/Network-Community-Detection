@@ -7,6 +7,7 @@ class Community:
         self._community_graph = None
 
         self._community = []
+        self._community_for_similarity = []
         self._commonality_calculation = {}
 
         self._reccursion_stack = []
@@ -17,10 +18,20 @@ class Community:
     def _set_threshold(self):
         s = 0
         count = 0
-        for n in list(self._graph.nodes):
-            for n_n in self._graph.neighbors(n):
-                s += self._get_commonality(n, n_n)
-                count += 1
+
+        shortest_path_gen = nx.all_pairs_shortest_path(self._graph, 2)
+
+        for shortest_path in shortest_path_gen:
+            node_from = shortest_path[0]
+            nodes_to = shortest_path[1]
+
+            for node_to in nodes_to:
+                if node_from < node_to:
+                    len_path = len(nodes_to[node_to])
+
+                    if len_path == 2 or len_path == 3:
+                        s += self._get_commonality(node_from, node_to)
+                        count += 1
 
         self._commonality_threshold = (s / count) * 0.7
 
@@ -51,33 +62,24 @@ class Community:
     def get_node_community(self, node):
         self._community = []
         self._pair_checked = []
-        print_log('get_node_community node_neighbor: ' + str(node))
+
         for node_neighbor in self._community_graph.neighbors(node):
             if not self._community:
-                print_log('get_node_community node_neighbor: ' + str(node_neighbor))
                 commonality = self._get_commonality(node, node_neighbor)
-                print_log('get_node_community node_neighbor commonality: ' + str(commonality))
+
                 if commonality > self._commonality_threshold:
                     self._append_stack(node, node_neighbor, 0)
                     self._append_stack(node_neighbor, node, 0)
 
                     self._run_reccursion()
 
-        return self._community
-
     def _check_second_node_neighbors_for_commonality(self, node1, node2, indent):
-        # print(' ' * indent, node1, node2, self._community)
-        print_log('_check_second_node_neighbors_for_commonality: ' + str(node1) + ' ' + str(node2))
         for node_neighbor in self._community_graph.neighbors(node2):
-            print_log('_check_second_node_neighbors_for_commonality node_neighbor: ' + str(node_neighbor))
             if node1 != node_neighbor and (node2, node_neighbor) not in self._pair_checked:
                 commonality_d1 = self._get_commonality(node2, node_neighbor)
                 commonality_d2 = self._get_commonality(node1, node_neighbor)
-                print_log('_check_second_node_neighbors_for_commonality commonality: ' + str(commonality_d1))
-                print_log('_check_second_node_neighbors_for_commonality commonality: ' + str(commonality_d2))
-                # print(' ' * indent, node_neighbor, commonality_d1, commonality_d2)
+
                 if commonality_d1 > self._commonality_threshold and commonality_d2 > self._commonality_threshold:
-                    print_log('_check_second_node_neighbors_for_commonality inside if')
                     if node1 not in self._community:
                         self._community.append(node1)
                     if node2 not in self._community:
@@ -94,16 +96,16 @@ class Community:
         while len(self._community_graph.nodes) > 0:
             node = random.choice(list(self._community_graph.nodes))
 
-            community = self.get_node_community(node)
+            self.get_node_community(node)
 
-            if not community:
+            if not self._community:
                 self._community_graph.remove_node(node)
             else:
-                communities.append(community)
-                for i in range(len(community)):
-                    for j in range(i + 1, len(community)):
-                        if self._community_graph.has_edge(community[i], community[j]):
-                            self._community_graph.remove_edge(community[i], community[j])
+                communities.append(self._community)
+                for i in range(len(self._community)):
+                    for j in range(i + 1, len(self._community)):
+                        if self._community_graph.has_edge(self._community[i], self._community[j]):
+                            self._community_graph.remove_edge(self._community[i], self._community[j])
 
             iso = list(nx.isolates(self._community_graph))
             for iso_node in iso:

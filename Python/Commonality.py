@@ -13,6 +13,8 @@ class Commonality:
         self._graph = nx.Graph()
         self._mongo = Mongo()
 
+        self.MAX_SIZE_FOR_FULL_PROCESS = 100000000
+
     @classmethod
     def load_from_graph(cls, graph, executions_folder):
         commonality = cls()
@@ -59,14 +61,13 @@ class Commonality:
 
         self._commonality_init()
 
+    def get_graph(self):
+        return self._graph
+
     def _commonality_init(self):
         self._count = [1, 1]
 
         self._arr_for_mongo = [[], []]
-
-        # self._community_graph = nx.Graph()
-
-        # self._k_array = []
 
     def _save_d(self, d_list, d):
         file_name_txt = self._graph.name + '_D=' + str(d) + '.txt'
@@ -300,11 +301,9 @@ class Commonality:
         self._process_d_columns(d_partial_random_list, d)
 
     def save_to_file(self):
-        max_size_for_full_process = 100000000
-
         d1_count = self._mongo.d1_get_count()
 
-        if d1_count <= max_size_for_full_process:
+        if d1_count <= self.MAX_SIZE_FOR_FULL_PROCESS:
             d_list = list(self._mongo.d1_get())
             self._process_d(d_list, 1)
         else:
@@ -312,7 +311,7 @@ class Commonality:
 
         d2_count = self._mongo.d2_get_count()
 
-        if d2_count <= max_size_for_full_process:
+        if d2_count <= self.MAX_SIZE_FOR_FULL_PROCESS:
             d_list = list(self._mongo.d2_get())
             self._process_d(d_list, 2)
         else:
@@ -358,3 +357,201 @@ class Commonality:
 
         if len(self._arr_for_mongo[1]) > 0:
             self._mongo.d2_insert_many(self._arr_for_mongo[1])
+
+    def _plot_alg(self, algorithm_and_d, both, inner, outer):
+        plt.clf()
+
+        data = [both, inner, outer]
+        plt.boxplot(data, showfliers=False)
+        plt.title(self._graph.name + '_' + algorithm_and_d, fontsize=18)
+        plt.xticks([1, 2, 3], ['All', 'Inner', 'Outer'])
+
+        plt.savefig(self._graph.name + '_' + algorithm_and_d + '.png')
+
+        plt.clf()
+
+        data = [both, inner, outer]
+        plt.boxplot(data, showfliers=True)
+        plt.title(self._graph.name + '_' + algorithm_and_d, fontsize=18)
+        plt.xticks([1, 2, 3], ['All', 'Inner', 'Outer'])
+
+        plt.savefig(self._graph.name + '_' + algorithm_and_d + '_with_outliers.png')
+
+    def box_plot_3_commonality(self):
+        z = round(len(self._graph.edges) / len(self._graph.nodes), 2)
+
+        alg1_d_1_inner = []
+        alg1_d_1_outer = []
+        alg1_d_1_all = []
+
+        alg1_d_2_inner = []
+        alg1_d_2_outer = []
+        alg1_d_2_all = []
+
+        alg1_d_all_inner = []
+        alg1_d_all_outer = []
+        alg1_d_all_all = []
+
+        alg2_d_1_inner = []
+        alg2_d_1_outer = []
+        alg2_d_1_all = []
+
+        alg2_d_2_inner = []
+        alg2_d_2_outer = []
+        alg2_d_2_all = []
+
+        alg2_d_all_inner = []
+        alg2_d_all_outer = []
+        alg2_d_all_all = []
+
+        alg3_d_1_inner = []
+        alg3_d_1_outer = []
+        alg3_d_1_all = []
+
+        alg3_d_2_inner = []
+        alg3_d_2_outer = []
+        alg3_d_2_all = []
+
+        alg3_d_all_inner = []
+        alg3_d_all_outer = []
+        alg3_d_all_all = []
+
+        d1_count = self._mongo.d1_get_count()
+
+        if d1_count <= self.MAX_SIZE_FOR_FULL_PROCESS:
+            d1 = self._mongo.d1_get()
+        else:
+            random_index = {}
+            while len(random_index) < 1000000:
+                rand = random.randint(0, d1_count)
+                if rand not in random_index:
+                    random_index[rand] = True
+
+            random_index_list = list(random_index.keys())
+            random_index.clear()
+
+            d1 = list(self._mongo.d1_get_by_index_list(random_index_list))
+
+        for d1_row in d1:
+            numerator = d1_row['numerator']
+            # denominator = d1_row['denominator_union']
+            denominator = d1_row['denominator']
+
+            alg1 = numerator
+            alg2 = numerator / denominator
+            alg3 = (numerator * numerator) / (z * denominator)
+
+            alg1_d_1_all.append(alg1)
+            alg1_d_all_all.append(alg1)
+
+            alg2_d_1_all.append(alg2)
+            alg2_d_all_all.append(alg2)
+
+            alg3_d_1_all.append(alg3)
+            alg3_d_all_all.append(alg3)
+
+            if d1_row['is_inner'] == 1:
+                alg1_d_1_inner.append(alg1)
+                alg1_d_all_inner.append(alg1)
+
+                alg2_d_1_inner.append(alg2)
+                alg2_d_all_inner.append(alg2)
+
+                alg3_d_1_inner.append(alg3)
+                alg3_d_all_inner.append(alg3)
+            else:
+                alg1_d_1_outer.append(alg1)
+                alg1_d_all_outer.append(alg1)
+
+                alg2_d_1_outer.append(alg2)
+                alg2_d_all_outer.append(alg2)
+
+                alg3_d_1_outer.append(alg3)
+                alg3_d_all_outer.append(alg3)
+
+        d2_count = self._mongo.d2_get_count()
+
+        if d2_count <= self.MAX_SIZE_FOR_FULL_PROCESS:
+            d2 = self._mongo.d2_get()
+        else:
+            random_index = {}
+            while len(random_index) < 1000000:
+                rand = random.randint(0, d1_count)
+                if rand not in random_index:
+                    random_index[rand] = True
+
+            random_index_list = list(random_index.keys())
+            random_index.clear()
+
+            d2 = list(self._mongo.d2_get_by_index_list(random_index_list))
+
+        for d2_row in d2:
+            numerator = d2_row['numerator']
+            # denominator = d2_row['denominator_union']
+            denominator = d2_row['denominator']
+
+            alg1 = numerator
+            alg2 = numerator / denominator
+            alg3 = (numerator * numerator) / (z * denominator)
+
+            alg1_d_2_all.append(alg1)
+            alg1_d_all_all.append(alg1)
+
+            alg2_d_2_all.append(alg2)
+            alg2_d_all_all.append(alg2)
+
+            alg3_d_2_all.append(alg3)
+            alg3_d_all_all.append(alg3)
+
+            if d2_row['is_inner'] == 1:
+                alg1_d_2_inner.append(alg1)
+                alg1_d_all_inner.append(alg1)
+
+                alg2_d_2_inner.append(alg2)
+                alg2_d_all_inner.append(alg2)
+
+                alg3_d_2_inner.append(alg3)
+                alg3_d_all_inner.append(alg3)
+            else:
+                alg1_d_2_outer.append(alg1)
+                alg1_d_all_outer.append(alg1)
+
+                alg2_d_2_outer.append(alg2)
+                alg2_d_all_outer.append(alg2)
+
+                alg3_d_2_outer.append(alg3)
+                alg3_d_all_outer.append(alg3)
+
+        print('Alg 1:')
+        print(median(alg1_d_all_all))
+        print(max(alg1_d_all_all))
+        print(median(alg1_d_all_inner))
+        print(max(alg1_d_all_inner))
+        print(median(alg1_d_all_outer))
+        print(max(alg1_d_all_outer))
+        print('Alg 2:')
+        print(median(alg2_d_all_all))
+        print(max(alg2_d_all_all))
+        print(median(alg2_d_all_inner))
+        print(max(alg2_d_all_inner))
+        print(median(alg2_d_all_outer))
+        print(max(alg2_d_all_outer))
+        print('Alg 3:')
+        print(median(alg3_d_all_all))
+        print(max(alg3_d_all_all))
+        print(median(alg3_d_all_inner))
+        print(max(alg3_d_all_inner))
+        print(median(alg3_d_all_outer))
+        print(max(alg3_d_all_outer))
+
+        '''self._plot_alg('Algorithm1_dall', alg1_d_all_all, alg1_d_all_inner, alg1_d_all_outer)
+        self._plot_alg('Algorithm1_d1', alg1_d_1_all, alg1_d_1_inner, alg1_d_1_outer)
+        self._plot_alg('Algorithm1_d2', alg1_d_2_all, alg1_d_2_inner, alg1_d_2_outer)
+
+        self._plot_alg('Algorithm2_dall', alg2_d_all_all, alg2_d_all_inner, alg2_d_all_outer)
+        self._plot_alg('Algorithm2_d1', alg2_d_1_all, alg2_d_1_inner, alg2_d_1_outer)
+        self._plot_alg('Algorithm2_d2', alg2_d_2_all, alg2_d_2_inner, alg2_d_2_outer)
+
+        self._plot_alg('Algorithm3_dall_z_' + str(z), alg3_d_all_all, alg3_d_all_inner, alg3_d_all_outer)
+        self._plot_alg('Algorithm3_d1_z_' + str(z), alg3_d_1_all, alg3_d_1_inner, alg3_d_1_outer)
+        self._plot_alg('Algorithm3_d2_z_' + str(z), alg3_d_2_all, alg3_d_2_inner, alg3_d_2_outer)'''

@@ -1,12 +1,28 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import networkx as nx
 import random
 import os
 
 from Mongo import Mongo
 from pymongo import UpdateOne
+from copy import copy
 
 PRINT_LOG = False
+
+
+def plot_distribution(distribution):
+    tt = {}
+    for i in distribution:
+        if i in tt:
+            tt[i] = tt[i] + 1
+        else:
+            tt[i] = 1
+
+    counts, bins = np.histogram(list(tt.values()))
+    plt.stairs(counts, bins)
+    plt.hist(bins[:-1], bins, weights=counts)
+    plt.show()
 
 
 def check_folder(folder_name):
@@ -184,7 +200,15 @@ def get_node_name_for_lattice(i, j):
     return str(i) + '-' + str(j)
 
 
-def randomize_in(g, p_in, i, lattice_size, z):
+def create_distribution(g):
+    distribution = []
+    for node in g.nodes:
+        distribution = distribution + [node] * len(g.edges(node))
+
+    return distribution
+
+
+def randomize_in(g, p_in, i, lattice_size, z, distribution=None):
     for _ in range(int(p_in * lattice_size * (z / 2) / 100)):
         neighbours = []
         while len(neighbours) == 0:
@@ -198,17 +222,35 @@ def randomize_in(g, p_in, i, lattice_size, z):
                     neighbours.append(n)
 
         fn = neighbours[random.randint(0, len(neighbours) - 1)]
-
         t = f
 
-        while g.has_edge(t, f) or t == f:
-            t = get_node_name_for_lattice(i, random.randint(0, lattice_size - 1))
+        if distribution is None:
+            while g.has_edge(t, f) or t == f:
+                t = get_node_name_for_lattice(i, random.randint(0, lattice_size - 1))
 
-        g.remove_edge(f, fn)
-        g.add_edge(f, t)
+            g.remove_edge(f, fn)
+            g.add_edge(f, t)
+        else:
+            distribution_copy = copy(distribution)
+
+            t_i = i
+
+            while (g.has_edge(t, f) or i != t_i or t == f) and len(distribution_copy) > 0:
+                distribution_copy.remove(t)
+                if len(distribution_copy) > 0:
+                    t = random.choice(distribution_copy)
+                    t_i = int(t[0:t.index('-')])
+
+            if (not g.has_edge(t, f)) and i == t_i and t != f:
+                g.remove_edge(f, fn)
+                g.add_edge(f, t)
+                distribution.remove(fn)
+                distribution.append(t)
+            else:
+                print('else', t, distribution_copy)
 
 
-def randomize_out(g, p_out, n, z):
+def randomize_out(g, p_out, n, z, distribution=None):
     for _ in range(int(p_out * n * (z / 2) / 100)):
         neighbours = []
 
@@ -218,13 +260,38 @@ def randomize_out(g, p_out, n, z):
 
         fn = neighbours[random.randint(0, len(neighbours) - 1)]
 
-        t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+        f_i = int(f[0:f.index('-')])
 
-        while g.has_edge(t, f) or t == f or str(t)[0] == str(f)[0]:
+        while True:
             t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+            if len(g.edges(t)) > 0:
+                break
 
-        g.remove_edge(f, fn)
-        g.add_edge(f, t)
+        t_i = int(t[0:t.index('-')])
+
+        if distribution is None:
+            while g.has_edge(t, f) or f_i == t_i:
+                t = list(g.nodes)[random.randint(0, len(g.nodes) - 1)]
+                t_i = int(t[0:t.index('-')])
+
+            g.remove_edge(f, fn)
+            g.add_edge(f, t)
+        else:
+            distribution_copy = copy(distribution)
+
+            while (g.has_edge(t, f) or f_i == t_i) and len(distribution) > 0:
+                distribution_copy.remove(t)
+                if len(distribution_copy) > 0:
+                    t = random.choice(distribution_copy)
+                    t_i = int(t[0:t.index('-')])
+
+            if (not g.has_edge(t, f)) and f_i != t_i:
+                g.remove_edge(f, fn)
+                g.add_edge(f, t)
+                distribution.remove(fn)
+                distribution.append(t)
+            else:
+                print('else', t, distribution_copy)
 
 
 def create_overlap(g, l, n):
@@ -295,7 +362,7 @@ def create_lattice(n, z, m, p_in, p_out, l):
     return g, ground_truth
 
 
-def randomize_lattice(g, p_in, p_out, l):
+def randomize_lattice(g, p_in, p_out, l, distribution=None):
     n = g.graph['n']
     z = g.graph['z']
     m = g.graph['m']
@@ -303,10 +370,10 @@ def randomize_lattice(g, p_in, p_out, l):
     lattice_size = int(n / m)
 
     for i in range(m):
-        randomize_in(g, p_in, i, lattice_size, z)
+        randomize_in(g, p_in, i, lattice_size, z, distribution)
 
     if m > 1:
-        randomize_out(g, p_out, n, z)
+        randomize_out(g, p_out, n, z, distribution)
 
         create_overlap(g, l, n)
 
@@ -317,9 +384,31 @@ def print_log(s):
         print(s)
 
 
-def get_similarity(ground_truth, communities, nodes_number):
+def get_similarity(communities, ground_truth, nodes_number):
     delta = 0
-    for c in communities:
+    for gt in ground_truth:
+        gt_set = set(gt)
+
+        max_index = -1
+        max_intersection = None
+        max_intersection_len = 0
+
+        for i in range(len(communities)):
+            current_intersection = gt_set.intersection(communities[i])
+            current_intersection_len = len(current_intersection)
+            if len(current_intersection) > max_intersection_len:
+                max_index = i
+                max_intersection = current_intersection
+                max_intersection_len = current_intersection_len
+
+        if max_index == -1:
+            t = {}
+        else:
+            t = list((gt_set | set(communities[max_index])) - max_intersection)
+
+        delta += len(t)
+
+    '''for c in communities:
         c_set = set(c)
 
         max_index = -1
@@ -333,10 +422,10 @@ def get_similarity(ground_truth, communities, nodes_number):
                 max_index = i
                 max_intersection = current_intersection
                 max_intersection_len = current_intersection_len
-
+                
         t = list((c_set | set(ground_truth[max_index])) - max_intersection)
 
-        delta += len(t)
+        delta += len(t)'''
 
     return 1 - (delta / nodes_number)
 

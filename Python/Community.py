@@ -2,7 +2,7 @@ from Utils import *
 
 
 class Community:
-    def __init__(self, g):
+    def __init__(self, g, algorithm, z=None):
         self._graph = g
         self._community_graph = None
 
@@ -12,6 +12,15 @@ class Community:
 
         self._reccursion_stack = []
         self._pair_checked = []
+
+        match algorithm:
+            case 1:
+                self.get_commonality = self._get_commonality1
+            case 2:
+                self.get_commonality = self._get_commonality2
+            case 3:
+                self.get_commonality = self._get_commonality3
+                self._z = z
 
         self._set_threshold()
 
@@ -30,12 +39,26 @@ class Community:
                     len_path = len(nodes_to[node_to])
 
                     if len_path == 2 or len_path == 3:
-                        s += self._get_commonality(node_from, node_to)
+                        s += self.get_commonality(node_from, node_to)
                         count += 1
 
         self._commonality_threshold = (s / count) * 0.7
 
-    def _get_commonality(self, node1, node2):
+    def _get_commonality1(self, node1, node2):
+        if node1 > node2:
+            min_node = node2
+            max_node = node1
+        else:
+            min_node = node1
+            max_node = node2
+
+        if (min_node, max_node) not in self._commonality_calculation:
+            numerator, denominator = calculate_commonality(self._graph, node1, node2)
+            self._commonality_calculation[(min_node, max_node)] = numerator
+
+        return self._commonality_calculation[(min_node, max_node)]
+
+    def _get_commonality2(self, node1, node2):
         if node1 > node2:
             min_node = node2
             max_node = node1
@@ -46,6 +69,20 @@ class Community:
         if (min_node, max_node) not in self._commonality_calculation:
             numerator, denominator = calculate_commonality(self._graph, node1, node2)
             self._commonality_calculation[(min_node, max_node)] = numerator / denominator
+
+        return self._commonality_calculation[(min_node, max_node)]
+
+    def _get_commonality3(self, node1, node2):
+        if node1 > node2:
+            min_node = node2
+            max_node = node1
+        else:
+            min_node = node1
+            max_node = node2
+
+        if (min_node, max_node) not in self._commonality_calculation:
+            numerator, denominator = calculate_commonality(self._graph, node1, node2)
+            self._commonality_calculation[(min_node, max_node)] = (numerator * numerator) / (denominator * self._z)
 
         return self._commonality_calculation[(min_node, max_node)]
 
@@ -65,7 +102,7 @@ class Community:
 
         for node_neighbor in self._community_graph.neighbors(node):
             if not self._community:
-                commonality = self._get_commonality(node, node_neighbor)
+                commonality = self.get_commonality(node, node_neighbor)
 
                 if commonality > self._commonality_threshold:
                     self._append_stack(node, node_neighbor, 0)
@@ -76,8 +113,8 @@ class Community:
     def _check_second_node_neighbors_for_commonality(self, node1, node2, indent):
         for node_neighbor in self._community_graph.neighbors(node2):
             if node1 != node_neighbor and (node2, node_neighbor) not in self._pair_checked:
-                commonality_d1 = self._get_commonality(node2, node_neighbor)
-                commonality_d2 = self._get_commonality(node1, node_neighbor)
+                commonality_d1 = self.get_commonality(node2, node_neighbor)
+                commonality_d2 = self.get_commonality(node1, node_neighbor)
 
                 if commonality_d1 > self._commonality_threshold and commonality_d2 > self._commonality_threshold:
                     if node1 not in self._community:

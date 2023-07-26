@@ -56,10 +56,13 @@ class Commonality:
     def _post_load(self, executions_folder):
         self._graph = nx.k_core(self._graph, 2)
 
-        self._output_path = executions_folder + '/' + self._graph.name + '_' + str(datetime.now().strftime("%d_%m_%Y_%H_%M_%S"))
+        self._output_path = executions_folder + self._graph.name + '_' + str(datetime.now().strftime("%d_%m_%Y_%H_%M_%S")) + '\\'
         os.makedirs(self._output_path)
 
         self._commonality_init()
+
+    def output_path(self):
+        return self._output_path
 
     def get_graph(self):
         return self._graph
@@ -378,7 +381,7 @@ class Commonality:
         plt.savefig(self._graph.name + '_' + algorithm_and_d + '_with_outliers.png')
 
     def box_plot_3_commonality(self):
-        z = round(len(self._graph.edges) / len(self._graph.nodes), 2)
+        z = round(2 * len(self._graph.edges) / len(self._graph.nodes), 2)
 
         alg1_d_1_inner = []
         alg1_d_1_outer = []
@@ -555,3 +558,76 @@ class Commonality:
         self._plot_alg('Algorithm3_dall_z_' + str(z), alg3_d_all_all, alg3_d_all_inner, alg3_d_all_outer)
         self._plot_alg('Algorithm3_d1_z_' + str(z), alg3_d_1_all, alg3_d_1_inner, alg3_d_1_outer)
         self._plot_alg('Algorithm3_d2_z_' + str(z), alg3_d_2_all, alg3_d_2_inner, alg3_d_2_outer)'''
+
+    def box_plot_3_commonality2(self):
+        z = 2 * len(self._graph.edges) / len(self._graph.nodes)
+
+        alg1_d_1_inner = []
+        alg1_d_1_outer = []
+        alg1_d_1_all = []
+
+        alg2_d_1_inner = []
+        alg2_d_1_outer = []
+        alg2_d_1_all = []
+
+        alg3_d_1_inner = []
+        alg3_d_1_outer = []
+        alg3_d_1_all = []
+
+        for edge in self._graph.edges:
+            if edge[0] < edge[1]:
+                node1 = edge[0]
+                node2 = edge[1]
+            else:
+                node1 = edge[1]
+                node2 = edge[0]
+
+            numerator, denominator = calculate_commonality(self._graph, node1, node2)
+
+            alg1 = numerator
+            alg2 = numerator / denominator
+            alg3 = (numerator * numerator) / (z * denominator)
+
+            alg1_d_1_all.append(alg1)
+
+            alg2_d_1_all.append(alg2)
+
+            alg3_d_1_all.append(alg3)
+
+            path = 'c:\\University\\Thesis\\Network-Community-Detection\\Data\\' + self._graph.name + 'Cmty\\1\\' + str(node1) + '.txt'
+
+            if os.path.exists(path):
+                file = open(path, mode='r')
+                community = file.read()
+                file.close()
+
+                len_community = len(community)
+
+                first_index = community.index('\n')
+                first_node = community[0: first_index]
+
+                if first_index + 1 < len_community:
+                    last_index = community[0: -1].rindex('\n')
+                    last_node = community[last_index + 1: len(community) - 1]
+                else:
+                    last_node = ''
+            else:
+                community = ''
+                first_node = ''
+                last_node = ''
+
+            str_neighbor = str(node2)
+
+            if str_neighbor == first_node or '\n' + str_neighbor + '\n' in community or str_neighbor == last_node:
+                alg1_d_1_inner.append(alg1)
+                alg2_d_1_inner.append(alg2)
+                alg3_d_1_inner.append(alg3)
+
+            else:
+                alg1_d_1_outer.append(alg1)
+                alg2_d_1_outer.append(alg2)
+                alg3_d_1_outer.append(alg3)
+
+        self._plot_alg('Algorithm1_d1', alg1_d_1_all, alg1_d_1_inner, alg1_d_1_outer)
+        self._plot_alg('Algorithm2_d1', alg2_d_1_all, alg2_d_1_inner, alg2_d_1_outer)
+        self._plot_alg('Algorithm3_d1_', alg3_d_1_all, alg3_d_1_inner, alg3_d_1_outer)

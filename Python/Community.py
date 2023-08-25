@@ -14,7 +14,6 @@ class Community:
         self._reccursion_stack = []
 
         self._community = None
-        # self._community_edges = None
         self._pair_checked = None
 
         match algorithm:
@@ -46,7 +45,7 @@ class Community:
                         s += self.get_commonality(node_from, node_to)
                         count += 1
 
-        self._commonality_threshold = (s / count) * 0.75
+        self._commonality_threshold = (s / count) * 0.7
 
     def _get_commonality1(self, node1, node2):
         if node1 > node2:
@@ -106,23 +105,21 @@ class Community:
 
     def get_node_community(self, node):
         self._community = set([])
-        # self._community_edges = []
         self._pair_checked = {}
 
         node_neighbors = list(self._community_graph.neighbors(node))
-
         for node_neighbor in node_neighbors:
-            if not self._community:
-                commonality = self.get_commonality(node, node_neighbor)
+            if self._community_graph.has_edge(node, node_neighbor):
+                self._community_graph.remove_edge(node, node_neighbor)
 
-                if commonality > self._commonality_threshold:
-                    self._append_stack(node, node_neighbor)
-                    self._append_stack(node_neighbor, node)
+                if not self._community:
+                    commonality = self.get_commonality(node, node_neighbor)
 
-                    self._run_reccursion()
+                    if commonality > self._commonality_threshold:
+                        self._append_stack(node, node_neighbor)
+                        self._append_stack(node_neighbor, node)
 
-                else:
-                    self._community_graph.remove_edge(node, node_neighbor)
+                        self._run_reccursion()
 
     def check_pair_checked(self, node1, node2):
         if node1 not in self._pair_checked:
@@ -135,26 +132,21 @@ class Community:
     def _check_second_node_neighbors_for_commonality(self, node1, node2):
         node2_neighbors = list(self._community_graph.neighbors(node2))
 
-        if node1 in node2_neighbors:
-            node2_neighbors.remove(node1)
-
         for node_neighbor in node2_neighbors:
-            commonality_d1 = self.get_commonality(node2, node_neighbor)
-            commonality_d2 = self.get_commonality(node1, node_neighbor)
+            if self._community_graph.has_edge(node2, node_neighbor):
+                commonality_d2 = self.get_commonality(node1, node_neighbor)
 
-            if commonality_d1 > self._commonality_threshold:
                 if commonality_d2 > self._commonality_threshold:
-                    self._community.add(node1)
-                    self._community.add(node2)
-                    self._community.add(node_neighbor)
+                    self._community_graph.remove_edge(node2, node_neighbor)
+                    commonality_d1 = self.get_commonality(node2, node_neighbor)
 
-                    if self._community_graph.has_edge(node1, node2):
-                        self._community_graph.remove_edge(node1, node2)
+                    if commonality_d1 > self._commonality_threshold:
+                        self._community.add(node1)
+                        self._community.add(node2)
+                        self._community.add(node_neighbor)
 
-                    self._append_stack(node2, node_neighbor)
-                    self._append_stack(node_neighbor, node2)
-            else:
-                self._community_graph.remove_edge(node2, node_neighbor)
+                        self._append_stack(node2, node_neighbor)
+                        self._append_stack(node_neighbor, node2)
 
     def get_communities(self):
         self._community_graph = self._graph.copy()
